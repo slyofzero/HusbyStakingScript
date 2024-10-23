@@ -10,8 +10,8 @@ async function sendRewards() {
   await Promise.all([syncPools()]);
 
   for (const poolData of pools) {
-    const { gasDepositTxn, rewardsDepositTxn } = poolData;
-    if (gasDepositTxn && rewardsDepositTxn) {
+    const { gasDepositTxn, rewardsDepositTxn, status } = poolData;
+    if (gasDepositTxn && rewardsDepositTxn && status === "PENDING") {
       updateDocumentById<StoredPool>({
         collectionName: "pools",
         id: poolData.id || "",
