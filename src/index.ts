@@ -1,13 +1,8 @@
 import { Timestamp } from "firebase-admin/firestore";
-import { pools, syncPools } from "./state";
+import { activePools, pools, syncPools } from "./state";
 import { getDocument, updateDocumentById } from "./firebase";
 import { StoredPool, StoredStakes } from "./types";
-import {
-  getEthBalance,
-  getTokenBalance,
-  transferEth,
-  transferTokens,
-} from "./utils/web3";
+import { getEthBalance, getTokenBalance, transferTokens } from "./utils/web3";
 import { log } from "./utils/handlers";
 
 async function sendRewards() {
@@ -15,6 +10,18 @@ async function sendRewards() {
   await Promise.all([syncPools()]);
 
   for (const poolData of pools) {
+    const { gasDepositTxn, rewardsDepositTxn } = poolData;
+    if (gasDepositTxn && rewardsDepositTxn) {
+      updateDocumentById<StoredPool>({
+        collectionName: "pools",
+        id: poolData.id || "",
+        updates: { status: "ACTIVE" },
+      });
+      log(`Activated Pool ${poolData.id}`);
+    }
+  }
+
+  for (const poolData of activePools) {
     const { closesAt } = poolData;
     const currentTimestamp = Timestamp.now();
 
@@ -31,7 +38,7 @@ async function sendRewards() {
 
       // Close the pool if all stakes have been rewarded
       if (stakes.length === 0) {
-        const [poolBalance, remainingEthBalance] = await Promise.all([
+        const [poolBalance] = await Promise.all([
           getTokenBalance(poolData.pool, poolData.token),
           getEthBalance(poolData.pool),
         ]);
